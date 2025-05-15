@@ -1,0 +1,118 @@
+
+GUÍA COMPLETA PARA ENTRENAR UN MODELO DE DETECCIÓN DE OBJETOS EN TENSORFLOW 2 (OBJETO: "WEED")
+
+1. CONFIGURACIÓN DEL ENTORNO
+-----------------------------
+
+1.1. Instalar Python 3.9 desde la página oficial: https://www.python.org/downloads/release
+
+1.2. Añadir Python al PATH.
+
+1.3. Verificar instalación:
+    py -3.9 --version
+
+1.4. Crear entorno virtual (opcional pero recomendado):
+    py -3.9 -m venv tf_env
+    .\tf_env\Scripts\activate
+
+1.5. Instalar TensorFlow 2.10.0 (compatible con object_detection API):
+    pip install tensorflow==2.10.0
+
+1.6. Instalar dependencias esenciales:
+    pip install pillow lxml Cython contextlib2 jupyter matplotlib pandas opencv-python tf-slim
+
+1.7. Instalar TensorFlow Addons compatible:
+    pip install tensorflow-addons==0.18.0
+
+1.8. Instalar protobuf compatible (en este caso usamos 3.19.4):
+    pip install protobuf==3.19.4
+
+
+2. CONFIGURACIÓN DEL MODELO API
+-------------------------------
+
+2.1. Clonar o descargar el repositorio oficial de TensorFlow Models:
+    https://github.com/tensorflow/models
+
+2.2. Instalar el compilador protoc:
+    https://github.com/protocolbuffers/protobuf/releases
+    Descargar el zip, extraer y agregar su ruta a variables de entorno (PATH).
+
+2.3. Desde la carpeta models/research, compilar los archivos proto:
+    protoc object_detection/protos/*.proto --python_out=.
+
+2.4. Añadir las siguientes rutas al PYTHONPATH:
+    set PYTHONPATH=%cd%;%cd%\slim
+
+3. VERIFICAR INSTALACIÓN DEL API
+--------------------------------
+    py -3.9 object_detection/builders/model_builder_tf2_test.py
+(Si termina sin errores, está correcto)
+
+
+4. PREPARACIÓN DE DATOS
+------------------------
+
+4.1. Estructura del dataset:
+    weeds_tfrecord/
+        ├── train/
+        │   ├── Plants.tfrecord
+        │   └── Plants_label_map.pbtxt
+        ├── valid/
+        │   ├── Plants.tfrecord
+        │   └── Plants_label_map.pbtxt
+
+4.2. Asegúrate de tener el archivo Plants_label_map.pbtxt con contenido como:
+
+    item {
+      id: 1
+      name: 'weed'
+    }
+
+5. CONFIGURAR MODELO PREENTRENADO
+----------------------------------
+
+5.1. Descargar el modelo base ssd_mobilenet_v2_fpnlite_320x320_coco17_tpu-8
+    y colocarlo en:
+    object_detection/pretrained_models/ssd_mobilenet_v2_fpnlite_320x320_coco17_tpu-8
+
+5.2. Editar el archivo pipeline.config:
+    - num_classes: 1
+    - fine_tune_checkpoint: ruta relativa al checkpoint base
+    - fine_tune_checkpoint_type: detection
+    - input_path: ruta relativa a los TFRecords de entrenamiento y validación
+    - label_map_path: ruta relativa a Plants_label_map.pbtxt
+    - batch_size: 8 (u otro)
+    - num_steps: 5000 (o el deseado)
+
+6. ENTRENAMIENTO DEL MODELO
+----------------------------
+    6.1 En una terminal dirijirse a la carpeta donde se encuentre los modelos, y entrar a la subcarpeta research
+
+    6.2 En la misma terminal ejecutar el siguiente codigo:
+    py -3.9 object_detection/model_main_tf2.py --pipeline_config_path=object_detection/pretrained_models/ssd_mobilenet_v2_fpnlite_320x320_coco17_tpu-8/pipeline.config --model_dir=training/weed_detector --alsologtostderr
+    (se puede cambiar el py -3.9 por python3.9 o solo python, dependiendo de como se tenga el entorno)
+
+7. VISUALIZAR CON TENSORBOARD
+------------------------------
+
+    py -3.9 -m tensorboard.main --logdir=training/weed_detector --port=6006
+    Acceder desde el navegador: http://localhost:6006/
+
+8. EXPORTAR MODELO ENTRENADO
+-----------------------------
+
+    py -3.9 object_detection/exporter_main_v2.py --input_type image_tensor --pipeline_config_path object_detection/pretrained_models/ssd_mobilenet_v2_fpnlite_320x320_coco17_tpu-8/pipeline.config --trained_checkpoint_dir training/weed_detector --output_directory exported_model/weed_detector_new
+    (Si se desea reentrenar, puede cambiar el nombre de la carpeta de exportacion modificando el output_directory)
+9. USO DEL MODELO EXPORTADO
+----------------------------
+
+    PATH_TO_SAVED_MODEL = "exported_model/weed_detector/saved_model"
+
+    import tensorflow as tf
+    detect_fn = tf.saved_model.load(PATH_TO_SAVED_MODEL)
+
+    # Cargar imagen y realizar predicción...
+
+--------------------------------------------
+FIN DE LA GUÍA.
